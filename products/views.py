@@ -6,16 +6,20 @@ def product_list(request):
     products = Product.objects.all()
     products_list = []
     for product in products:
-        products_list.append({
+        product_data = {
             'id': product.id,
             'name': product.name,
             'description': product.description,
             'price': str(product.price),
-            'photo': product.photo.url if product.photo else None,
             'in_stock' : product.in_stock,
             'category': product.category.name,
             'count': product.count,
-        })
+        }
+        if product.photo:
+            product_data['photo'] = product.get_absolute_url(request)
+        else:
+            product_data['photo'] = None
+        products_list.append(product_data)
     return JsonResponse({'products': products_list, 'count': len(products_list)})
 
 def category_list(request):

@@ -2,7 +2,10 @@ from django.http import JsonResponse
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
+from rest_framework.authtoken.models import Token
 import json
+
+from .auth_utils import get_authenticated_user, serialize_user
 
 @require_http_methods(["POST"]) 
 def register(request):
@@ -32,8 +35,15 @@ def register(request):
         return JsonResponse({'error': 'Password must be at least 6 characters long'}, status=400)
     
     user = User.objects.create_user(username=username, email=email, password=password)
-    return JsonResponse({'message': 'User registered successfully', 'user': 
-                         {'id': user.id, 'username': user.username, 'email': user.email}})
+    token, _ = Token.objects.get_or_create(user=user)
+    login(request, user)
+    return JsonResponse(
+        {
+            'message': 'User registered successfully',
+            'token': token.key,
+            'user': serialize_user(user),
+        }
+    )
     
 @require_http_methods(["POST"])
 def user_login(request):
@@ -52,22 +62,31 @@ def user_login(request):
         return JsonResponse({'error': 'Invalid credentials'}, status=400)
     
     login(request, user)
-    return JsonResponse({'message': 'Login successful', 'user':
-                         {'id': user.id, 'username': user.username, 'email': user.email}})
+    token, _ = Token.objects.get_or_create(user=user)
+    return JsonResponse(
+        {
+            'message': 'Login successful',
+            'token': token.key,
+            'user': serialize_user(user),
+        }
+    )
 
 @require_http_methods(["POST"])
 def user_logout(request):
-    
-    if not request.user.is_authenticated:
+    user = get_authenticated_user(request)
+
+    if not user or not user.is_authenticated:
         return JsonResponse({'error': 'User not logged in'}, status=400)
-    
+
+    Token.objects.filter(user=user).delete()
     logout(request)
     return JsonResponse({'message': 'Logout successful'})
 
 @require_http_methods(["GET"])
 def user_detail(request):
-    if not request.user.is_authenticated:
+    user = get_authenticated_user(request)
+
+    if not user or not user.is_authenticated:
         return JsonResponse({'error': 'User not logged in'}, status=400)
-    
-    user = request.user
-    return JsonResponse({'user': {'id': user.id, 'username': user.username, 'email': user.email}})
+
+    return JsonResponse({'user': serialize_user(user)})

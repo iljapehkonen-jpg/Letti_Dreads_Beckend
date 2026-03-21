@@ -1,29 +1,53 @@
 from django.http import JsonResponse
-from django.shortcuts import render
 from cart.models import Cart
+from users.auth_utils import get_authenticated_user
 
-def user_cart(request, user_id):
-    cart = Cart.objects.all()
-    cart_data = []
-    for item in cart:
-        if item.user.id != user_id:
-            continue
-        cart_data.append({
-            'id': item.id,
-            'count': item.count,
-            'product': {
-                'id': item.product.id,
-                'name': item.product.name,
-                'description': item.product.description,
-                'price': float(item.product.price),
-                'in_stock': item.product.in_stock,
-                'count': item.product.count,
-            },
-            'user': item.user.id,
-        })
+
+def _serialize_cart_item(request, item):
+    return {
+        'id': item.id,
+        'count': item.count,
+        'product': {
+            'id': item.product.id,
+            'name': item.product.name,
+            'description': item.product.description,
+            'price': float(item.product.price),
+            'in_stock': item.product.in_stock,
+            'count': item.product.count,
+            'photo': item.product.get_absolute_url(request),
+            'images': item.product.get_gallery_urls(request),
+            'category': item.product.category.name,
+        },
+        'user': item.user.id,
+    }
+
+
+def user_cart(request):
+    user = get_authenticated_user(request)
+
+    if not user or not user.is_authenticated:
+        return JsonResponse({'error': 'User not logged in'}, status=401)
+
+    cart = (
+        Cart.objects.select_related('product', 'product__category', 'user')
+        .prefetch_related('product__images')
+        .filter(user=user)
+    )
+    cart_data = [_serialize_cart_item(request, item) for item in cart]
+
     return JsonResponse({
         'cart':cart_data,
     })
+
+
+def legacy_user_cart(request, user_id):
+    cart = (
+        Cart.objects.select_related('product', 'product__category', 'user')
+        .prefetch_related('product__images')
+        .filter(user_id=user_id)
+    )
+    cart_data = [_serialize_cart_item(request, item) for item in cart]
+    return JsonResponse({'cart': cart_data})
 def add_to_cart(request, user_id, product_id):
     cart = Cart.objects.all()
     for item in cart:

@@ -63,3 +63,31 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"{self.product.name} image #{self.id}"
 
+
+class HomeGalleryImage(models.Model):
+    image = models.ImageField(upload_to="home/gallery/")
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "Home gallery image"
+        verbose_name_plural = "Home gallery images"
+
+    def __str__(self):
+        return f"Gallery image #{self.id}"
+
+
+class HomeReviewImage(models.Model):
+    image = models.ImageField(upload_to="home/reviews/")
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "Home review image"
+        verbose_name_plural = "Home review images"
+
+    def __str__(self):
+        return f"Review image #{self.id}"
+

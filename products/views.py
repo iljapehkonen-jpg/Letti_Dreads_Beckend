@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from .models import Category, Product
+from .models import Category, HomeGalleryImage, HomeReviewImage, Product
 
 
 def product_list(request):
@@ -56,3 +56,23 @@ def product_detail(request, product_id):
         "category": {"id": product.category.id, "name": product.category.name},
     }
     return JsonResponse(product_data)
+
+
+def home_media(request):
+    gallery_images = [
+        request.build_absolute_uri(image.image.url)
+        for image in HomeGalleryImage.objects.all()
+        if image.image and hasattr(image.image, "url")
+    ]
+    review_images = [
+        request.build_absolute_uri(image.image.url)
+        for image in HomeReviewImage.objects.all()
+        if image.image and hasattr(image.image, "url")
+    ]
+
+    return JsonResponse(
+        {
+            "gallery": gallery_images,
+            "reviews": review_images,
+        }
+    )

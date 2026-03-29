@@ -89,4 +89,5 @@ def user_detail(request):
     if not user or not user.is_authenticated:
         return JsonResponse({'error': 'User not logged in'}, status=400)
 
-    return JsonResponse({'user': serialize_user(user)})
+    token, _ = Token.objects.get_or_create(user=user)
+    return JsonResponse({'user': serialize_user(user), 'token': token.key})

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -8,6 +9,22 @@ from django.views.decorators.http import require_http_methods
 from cart.models import Cart, Order, OrderItem
 from products.models import Product
 from users.auth_utils import get_authenticated_user
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _serialize_cart_item(request, item):
@@ -33,32 +50,39 @@ def _serialize_cart_item(request, item):
 
 
 def _serialize_order_item(item):
+    unit_price = _safe_float(item.unit_price)
+    strand_quantity = _safe_int(item.strand_quantity, 0)
+    set_quantity = _safe_int(item.set_quantity, 0)
+
     return {
         "id": item.id,
         "product_id": item.product_id,
-        "product_name": item.product_name,
-        "product_image": item.product_image,
-        "length": item.length,
-        "color": item.color,
-        "strand_quantity": item.strand_quantity,
-        "set_quantity": item.set_quantity,
-        "unit_price": float(item.unit_price),
-        "total_price": float(item.unit_price) * item.strand_quantity * item.set_quantity,
+        "product_name": item.product_name or "",
+        "product_image": item.product_image or "",
+        "length": item.length or "",
+        "color": item.color or "",
+        "strand_quantity": strand_quantity,
+        "set_quantity": set_quantity,
+        "unit_price": unit_price,
+        "total_price": unit_price * strand_quantity * set_quantity,
     }
 
 
 def _serialize_order(order):
+    if not order:
+        return None
+
     return {
         "id": order.id,
-        "email": order.email,
-        "nickname": order.nickname,
-        "address": order.address,
-        "city": order.city,
-        "postal_code": order.postal_code,
-        "phone": order.phone,
-        "status": order.status,
-        "status_label": order.get_status_display(),
-        "created_at": order.created_at.isoformat(),
+        "email": order.email or "",
+        "nickname": order.nickname or "",
+        "address": order.address or "",
+        "city": order.city or "",
+        "postal_code": order.postal_code or "",
+        "phone": order.phone or "",
+        "status": order.status or "",
+        "status_label": order.get_status_display() if order.status else "",
+        "created_at": order.created_at.isoformat() if order.created_at else None,
         "items": [_serialize_order_item(item) for item in order.items.all()],
     }
 
@@ -100,7 +124,13 @@ def user_orders(request):
         return JsonResponse({"error": "User not logged in"}, status=401)
 
     orders = _get_user_orders_queryset(user)
-    return JsonResponse({"orders": [_serialize_order(order) for order in orders]})
+    serialized_orders = []
+    for order in orders:
+        try:
+            serialized_orders.append(_serialize_order(order))
+        except Exception:
+            logger.exception("Failed to serialize order %s for user %s", order.id, user.id)
+    return JsonResponse({"orders": serialized_orders})
 
 
 @require_http_methods(["GET"])
@@ -109,8 +139,14 @@ def latest_order(request):
     if not user:
         return JsonResponse({"error": "User not logged in"}, status=401)
 
-    order = _get_user_orders_queryset(user).first()
-    return JsonResponse({"order": _serialize_order(order) if order else None})
+    orders = _get_user_orders_queryset(user)
+    for order in orders:
+        try:
+            return JsonResponse({"order": _serialize_order(order)})
+        except Exception:
+            logger.exception("Failed to serialize latest order %s for user %s", order.id, user.id)
+
+    return JsonResponse({"order": None})
 
 
 @require_http_methods(["POST"])
@@ -131,8 +167,8 @@ def add_cart_item(request):
     product = get_object_or_404(Product.objects.select_related("category"), id=product_id)
     length = str(data.get("length") or "")
     color = str(data.get("color") or "")
-    strand_quantity = max(10, min(65, int(data.get("strand_quantity") or 10)))
-    count = max(1, int(data.get("count") or 1))
+    strand_quantity = max(10, min(65, _safe_int(data.get("strand_quantity"), 10)))
+    count = max(1, _safe_int(data.get("count"), 1))
 
     cart_item, created = Cart.objects.get_or_create(
         user=user,
@@ -227,12 +263,12 @@ def update_cart_item(request, item_id):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     cart_item = get_object_or_404(_get_user_cart_queryset(user), id=item_id)
-    count = max(1, int(data.get("count") or cart_item.count))
+    count = max(1, _safe_int(data.get("count"), cart_item.count))
     length = str(data.get("length") or cart_item.length or "")
     color = str(data.get("color") or cart_item.color or "")
     strand_quantity = max(
         10,
-        min(65, int(data.get("strand_quantity") or cart_item.strand_quantity)),
+        min(65, _safe_int(data.get("strand_quantity"), cart_item.strand_quantity)),
     )
 
     duplicate_item = (

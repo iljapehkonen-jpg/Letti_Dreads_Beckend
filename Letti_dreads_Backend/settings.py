@@ -3,7 +3,7 @@ import os
 
 from pathlib import Path
 
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -24,7 +24,17 @@ SECRET_KEY = 'django-insecure-0utj63-!ji2q#bx^=lc=^z+da2^j-nedfg7tv@zx1#bq^@n2l=
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+]
+
+extra_allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
+if extra_allowed_hosts:
+    ALLOWED_HOSTS.extend(
+        [host.strip() for host in extra_allowed_hosts.split(",") if host.strip()]
+    )
 
 
 # Application definition

@@ -60,12 +60,12 @@ def product_detail(request, product_id):
 
 def home_media(request):
     gallery_images = [
-        request.build_absolute_uri(image.image.url)
+        image.image.url
         for image in HomeGalleryImage.objects.all()
         if image.image and hasattr(image.image, "url")
     ]
     review_images = [
-        request.build_absolute_uri(image.image.url)
+        image.image.url
         for image in HomeReviewImage.objects.all()
         if image.image and hasattr(image.image, "url")
     ]

@@ -26,20 +26,20 @@ class Product(models.Model):
             return self.photo.url
         return None
 
-    def get_absolute_url(self, request):
+    def get_absolute_url(self, request=None):
         if self.photo and hasattr(self.photo, "url"):
-            return request.build_absolute_uri(self.photo.url)
+            return self.photo.url
         return None
 
-    def get_gallery_urls(self, request):
+    def get_gallery_urls(self, request=None):
         gallery = []
 
         if self.photo and hasattr(self.photo, "url"):
-            gallery.append(request.build_absolute_uri(self.photo.url))
+            gallery.append(self.photo.url)
 
         for image in self.images.all():
             if image.image and hasattr(image.image, "url"):
-                gallery.append(request.build_absolute_uri(image.image.url))
+                gallery.append(image.image.url)
 
         return gallery
 
